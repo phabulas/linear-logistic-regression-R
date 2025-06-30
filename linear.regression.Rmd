@@ -1,0 +1,126 @@
+---
+title: "linear.regression"
+---
+
+
+## Dataset Description
+
+This analysis uses the `home.txt` dataset, which contains information about various houses. The variables included are:
+
+- **Price**: Selling price of the house
+- **Size**: Size in square feet
+- **Position**: Exposure, coded as North (0) or South (1)
+- **Corner**: Whether it is a corner house, coded as No (0) or Yes (1)
+- **Taxes**: Annual property taxes
+
+```{r}
+home <- read.delim("home.txt")
+```
+
+### Comparing Variances of Selling Price
+
+In this section, we want to check whether the variability in selling prices is the same for corner houses and non-corner houses. We'll test the hypothesis that the two groups have equal variances against the alternative that their variances are different, using a 5% significance level. To do this, we'll use the `var.test()` function in R.
+
+```{r}
+var.test(price ~ corner, home)
+```
+
+After running the test, we obtain a p-value of 0.5483, which is above the 0.05 significance level. This means we do not have enough statistical evidence to reject the null hypothesis. In other words, we can assume equal variances between corner and non-corner houses for the following analyses.
+
+Below, we display the variance of selling prices for non-corner houses (corner = 0) and corner houses (corner = 1).
+
+
+```{r}
+var(home$price[home$corner == 0])
+var(home$price[home$corner == 1])
+```
+
+### Comparing Mean Selling Prices
+
+In this section, we want to test whether the mean selling price is the same for corner houses and non-corner houses. We'll check the hypothesis that the two groups have equal means against the alternative that their means are different. We'll use the `t.test()` function for this comparison.
+
+Since in the previous step we found no evidence of unequal variances, we'll assume equal variances and perform a two-sample t-test with that assumption.
+
+
+```{r}
+t.test(price ~ corner, home,var.equal = TRUE)
+```
+
+After running the test, we get a p-value higher than 0.05. This means we do not have enough evidence to say that the mean selling price of corner houses is different from that of non-corner houses. We fail to reject the null hypothesis of equal means, indicating there is no significant difference in prices between the two groups.
+
+---
+
+### Multiple Linear Regression Analysis
+
+Next, we'll estimate a multiple linear regression model to explain selling price as a function of Size, Taxes, Position, and Corner. We'll use the `lm()` function in R and then discuss the sign and statistical significance of the estimated coefficients.
+
+
+```{r}
+model = lm(price ~ size + position + corner + taxes, home)
+summary(model)
+```
+#### Interpretation of Regression Coefficients
+
+- **Size**: The coefficient is positive and highly significant. This suggests that, holding other variables constant, larger houses tend to sell for higher prices. On average, each additional square foot adds about 0.578 units to the selling price.
+
+- **Position**: The coefficient is positive, indicating that south-facing houses might sell for about 34.23 units more than north-facing ones. However, this effect is not statistically significant in this sample, so we can't be confident there's a real difference.
+
+- **Corner**: The coefficient is negative (-12.03), suggesting corner houses might sell for a bit less, but again, this effect is not statistically significant.
+
+- **Taxes**: The coefficient is positive (0.3373), but there's no strong evidence that higher taxes meaningfully influence the selling price in this data.
+
+---
+
+#### Exploring the Relationship Between Size and Price
+
+To better understand the strong effect of `Size`, we can visualize the relationship with a scatterplot and regression line. This plot helps confirm the positive linear trend seen in the model.
+
+```{r scatter-size-price, echo=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+ggplot(home, aes(x = size, y = price)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "steelblue") +
+  labs(
+    x ="Size (square feet)",
+    y = "Selling Price",
+    title = "Relationship Between Size and Selling Price"
+  ) +
+  theme_minimal()
+```
+<!-- -->
+### Evaluating Model Fit with R-squared
+
+Next, we'll calculate and interpret the R-squared and adjusted R-squared values for our regression model. These metrics help us understand how well the model explains the variability in selling prices.
+
+
+```{r}
+y = home$price
+
+SST   = sum((y - mean(y))^2)
+SSreg = sum((model$fitted.values - mean(y))^2)
+SSE   = sum(model$residuals^2)
+R_Squared = SSreg/SST
+Adj_R_Squared = 1-(SSE/SST) * (97/93)
+
+R_Squared
+Adj_R_Squared
+```
+
+The model explains about 81.9% of the variability in selling prices. After adjusting for the number of predictors, the adjusted R-squared drops slightly to 81.1%. This suggests that adding these variables doesn't provide much extra explanatory power, even though the overall model still fits the data well.
+
+---
+
+### Testing Joint Significance of Variables
+
+Next, we'll use an F-test to check whether the coefficients for `Corner` and `Taxes` are jointly equal to zero. This helps us see if these two variables together significantly improve the model.
+
+
+```{r}
+modello_restricted = lm(price ~ size + position, home)
+
+anova(model, modello_restricted)
+```
+The p-value is much higher than 0.05, so we fail to reject the null hypothesis. We don't have evidence that Corner and Taxes, taken together, significantly help explain the selling price. In conclusion, adding these two variables does not result in any statistically meaningful increase in explained variability.
+

@@ -1,0 +1,126 @@
+---
+title: "logistic.regression"
+---
+
+
+## Dataset Description
+
+The `efige.txt` dataset contains information on a sample of Italian companies from different economic sectors. Each firm is described by several variables, with their definitions provided in the accompanying legend file.
+
+---
+
+## Modeling Objective
+
+In this section, we'll define and estimate a **logistic regression model** for the binary response variable `widened_prod_range`, which indicates whether a company has expanded its product range. We'll also interpret the effect of each explanatory variable on the likelihood of this outcome.
+
+```{r}
+data <- read.delim("efige.txt") 
+```
+
+We start by estimating a full logistic regression model that includes fifteen explanatory variables considered theoretically relevant for predicting whether a firm has expanded its product range. 
+These variables cover different aspects such as innovation, international openness, ownership structure, geographic location, and firm performance. 
+This initial specification serves as the starting point for selecting the most statistically relevant predictors in the next steps.
+
+```{r}
+model_full <- glm(widened_prod_range ~ prod_inn + proc_inn + RD_inv +
+                  direct_export + import_goods_china_india +
+                  group + female_ceo + fam_ceo +
+                  north + centre + patent +
+                  competitors_from_abroad + qual_cert + deloc_fdi,
+                  data = data,
+                  family = "binomial")
+summary(model_full)
+```
+From the results of the full model, only a few variables are statistically significant at the conventional 5% level. 
+
+Specifically, `prod_inn`, `proc_inn`, `RD_inv`, `import_goods_china_india`, and `fam_ceo` show a significant association with the likelihood that a firm has expanded its product range.
+
+
+```{r}
+model_final <- glm(widened_prod_range ~ prod_inn + proc_inn + RD_inv +
+                   import_goods_china_india + fam_ceo,
+                   data = data,
+                   family = "binomial")
+summary(model_final)
+```
+The estimated coefficients are positive, suggesting that introducing product or process innovations, investing in R&D, importing intermediate goods from China or India, and having a family CEO all increase the likelihood that a firm has expanded its product range.
+
+
+```{r}
+exp(coef(model_final))
+```
+#### Interpreting Odds Ratios
+
+The analysis of odds ratios confirms that all selected variables are associated with an increased likelihood of a firm expanding its product range. 
+
+For product innovation, the odds ratio is over 3.8, meaning firms introducing product innovations are more than three times as likely to expand their range. 
+
+Process innovation, R&D investment, imports from China or India, and having a family CEO also show positive effects, with odds ratios between about 1.37 and 1.80.
+
+---
+
+#### Visualizing the Effect of Product Innovation
+
+The following plot shows the percentage of firms that expanded their product range based on whether they introduced product innovations (`prod_inn`). There's a clear difference: innovative firms have a much higher probability of expanding, which aligns with the logistic regression results.
+
+```{r barplot-prod_inn, echo=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+
+data %>%
+  group_by(prod_inn) %>%
+  summarise(perc_widened = mean(widened_prod_range) * 100) %>%
+  ggplot(aes(x = factor(prod_inn), y = perc_widened, fill = factor(prod_inn))) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  labs(
+    x = "Innovazione di prodotto (prod_inn)",
+    y = "% imprese con gamma ampliata",
+    title = "Ampliamento gamma e innovazione di prodotto"
+  ) +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Sì")) +
+  theme_minimal()
+```
+As further evidence, the following boxplot shows the distribution of predicted probabilities from the model for the two groups (`prod_inn` = 0 and `prod_inn` = 1). 
+
+Firms that introduced product innovations have noticeably higher fitted values, reinforcing the importance of this variable.
+
+```{r fitted-probabilities-prod_inn, echo=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+# data
+data$fitted_probs <- fitted(model_final)
+
+# plot
+ggplot(data, aes(x = factor(prod_inn), y = fitted_probs, fill = factor(prod_inn))) +
+  geom_boxplot(show.legend = FALSE) +
+  labs(
+    x = "Product Innovation (prod_inn)",
+    y = "Predicted Probability of Expanding Range",
+    title = "Predicted Probabilities from Logit Model by prod_inn"
+  ) +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  theme_minimal()
+```
+
+After examining the effect of individual predictors, we now evaluate the overall fit of the model.
+
+Comparing the null deviance (1544.2) to the residual deviance (1355.3) shows a significant reduction, indicating that the model explains a meaningful portion of the observed variability.
+
+The Akaike Information Criterion (AIC) is 1367.3, which is relatively low and suggests a good balance between explanatory power and simplicity.
+
+Finally, we also calculate the Pseudo R-squared as an additional measure of model quality.
+
+
+```{r}
+pseudo_R2 <- 1 - (model_final$deviance / model_final$null.deviance)
+pseudo_R2
+```
+
+The final model identifies several significant factors linked to expanding a firm's product range: introducing product and process innovations, investing in R&D, importing intermediate goods from China or India, and having a family CEO.
+
+Overall, the model's fit—based on residual deviance, AIC, and Pseudo R-squared—is satisfactory.
+
+These results align with existing evidence highlighting the importance of innovation, international openness, and governance characteristics in shaping firms' growth strategies.
+
